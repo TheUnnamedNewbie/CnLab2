@@ -34,6 +34,9 @@ class HTTPclient {
 			if(inputUser.contains("Stop")){
 			
 				running = false;
+				System.out.println("Sending Stop Command to servern...");
+				outputServer.writeBytes("Stop");
+				System.out.println("Stop signal sent....");
 				System.out.println("closing socket...");			
 			
 			} else { 

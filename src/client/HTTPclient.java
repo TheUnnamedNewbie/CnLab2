@@ -14,24 +14,37 @@ class HTTPclient {
 	//Defenitions:
 	private static final int socketPort = 44444;
 	
-	
+	private static boolean running = true;
 	
 	
 	public static void main(String arg[]) throws Exception
 	{
+		
+		// setting up IO
+		Socket connectionSocket = new Socket("localhost", socketPort);
+		DataOutputStream outputServer = new DataOutputStream(connectionSocket.getOutputStream());
+		BufferedReader input = new BufferedReader(new InputStreamReader(System.in));		
+		
+		while(running){
 	
-	BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
-	System.out.print("From Console: ");
-	
-	String inputUser = input.readLine();
-	System.out.println("I sent: " + inputUser);
-	
-	Socket connectionSocket = new Socket("localhost", socketPort);
-	DataOutputStream outputServer = new DataOutputStream(connectionSocket.getOutputStream());
-	outputServer.writeBytes(inputUser + '\n');
+			System.out.print("From Console: ");
+			
+			String inputUser = input.readLine();
+			
+			if(inputUser.contains("Stop")){
+			
+				running = false;
+				System.out.println("closing socket...");			
+			
+			} else { 
+			
+				System.out.println("I sent: " + inputUser);
+				outputServer.writeBytes(inputUser + '\n');
+			
+			}
+		}
 	connectionSocket.close();
-	
-	
+	System.out.println("Socket closed succesfully. Goodbye.");
 	
 	}
 	

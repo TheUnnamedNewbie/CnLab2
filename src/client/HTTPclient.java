@@ -11,36 +11,45 @@ import java.net.*;
 class HTTPclient {
 	
 	
+	private static final int nbCommands = 3; //amount of commands the original call of server should contain.
+	
 	
 	//CommandSettings:
 	public static HTTPCommand commandType;
-	public int port;
-	public String version;
+	public static int port;
+	public static String version;
 	
 	
 	
 	public static void main(String arg[]) throws Exception
 	{	
-		/*parsing arguments. Room for improvement. Currently just checks if there are enought and then continues, things can be edited later to be more flexible.
-		 *
-		 */
-			if(arg.length < 2){
-				commandType = parseVersion(arg[0]);
-			} else {toConsole("You're an idiot");}
-			printCommand();
+		//Parsing of data
+			if(arg.length != nbCommands){ //Checking if enought commands are given.
+				toConsole("Not enought data given. Please try again.");
+			} else{
+				commandType = parseVersion(arg[0]); //find out what type of HTTP command you have given.
+				if(commandType == HTTPCommand.INVALID){ //check if it was an actual legal type
+					toConsole("Invalid HTTP command. Try again."); //abort if not legal
+				} else { 
+					boolean legalPort = parsePort(arg[2]); //find out what port you have given me
+					if(legalPort){ //if its a good port number, continue
+						parseInputURI(arg[1]);
+					}
+				}
+			} 
 			
 	}
 	
-	public static void printCommand() {
-		if(commandType == HTTPCommand.GET){System.out.println("Command is GET");}
-		else if(commandType ==HTTPCommand.HEAD){System.out.println("Command is HEAD");}
-		
-	}
+	
+	/*********************************
+	 *******ARGUMENT PARSING**********
+	 ********************************/
+	
 	
 	/**
-	 * Sets the version of command this client has to pull off.
+	 * Sets the version of command this client has to excecute.
 	 * @param version
-	 * @return
+	 * @return HTTPCommand.version, version is invalid if not valid
 	 */
 	private static HTTPCommand parseVersion(String version){
 		if(version.contains("GET")) {return HTTPCommand.GET;}
@@ -49,13 +58,46 @@ class HTTPclient {
 		else if(version.contains("POST")) {return HTTPCommand.POST;}
 		return HTTPCommand.INVALID;
 	}
-	//private int countWhitespaces(String data[]){
+	
+	
+	/**
+	 * Sets the port given at startup.
+	 * @param portString
+	 * @return a boolean indicating if the given port was a legal one.
+	 */
+	private static boolean parsePort(String portString){
+		try{
+			port = Integer.parseInt(portString);
+		} catch(NumberFormatException e) {toConsole("Port not a number!"); return false;}
+		if(port < 1){toConsole("Bad port number! Try again"); return false;}
+		if(port > 65535){toConsole("Bad port number! Try again"); return false;}
+		return true;
+	}
+	
+	
+	
+	private static void parseInputURI(String inputURI){
+		
+	}
+	
+	
+	
 	
 	private static void toConsole(String data){
 		System.out.println(data);
 	}
-		
-		
+	
+	
+	
+	//TESTMETHOD NOT SUPPOSED TO BE IN FINAL PRODUCT
+		public static void printCommand() {
+			if(commandType == HTTPCommand.GET){System.out.println("Command is GET");}
+			else if(commandType ==HTTPCommand.HEAD){System.out.println("Command is HEAD");}
+			
+		}
+}
+
+/*
 		
 //		
 //		{	
@@ -99,3 +141,4 @@ class HTTPclient {
 	
 
 }
+*/

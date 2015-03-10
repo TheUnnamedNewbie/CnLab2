@@ -12,7 +12,7 @@ import java.net.*;
 class HTTPclient {
 	
 	//Defenitions:
-	private static final int socketPort = 44444;
+	private static final int socketPort = 80;
 	
 	private static boolean running = true;
 	
@@ -21,8 +21,9 @@ class HTTPclient {
 	{
 		
 		// setting up IO
-		Socket connectionSocket = new Socket("localhost", socketPort);
+		Socket connectionSocket = new Socket("www.esat.kuleuven.be", socketPort);
 		DataOutputStream outputServer = new DataOutputStream(connectionSocket.getOutputStream());
+		BufferedReader recievedData = new BufferedReader(new InputStreamReader(connectionSocket.getInputStream()));
 		BufferedReader input = new BufferedReader(new InputStreamReader(System.in));		
 		
 		while(running){
@@ -30,21 +31,26 @@ class HTTPclient {
 			System.out.print("From Console: ");
 			
 			String inputUser = input.readLine();
-			
-			if(inputUser.contains("Stop")){
-			
+			outputServer.writeBytes("GET /cde/bestelaanvraag_elcomp_NL.html" + "\n");
+			outputServer.writeBytes("Host: www.esat.kuleuven.be" + "\n");
+			outputServer.writeBytes("\n");
+		
+			/*if(inputUser.contains("Stop")){
 				running = false;
 				System.out.println("Sending Stop Command to servern...");
 				outputServer.writeBytes("Stop");
 				System.out.println("Stop signal sent....");
-				System.out.println("closing socket...");			
-			
-			} else { 
-			
-				System.out.println("I sent: " + inputUser);
-				outputServer.writeBytes(inputUser + '\n');
-			
+				System.out.println("closing socket...");
+				}
+			*/
+			while(true){
+				String recievedDataString = recievedData.readLine();
+				if(recievedDataString != null){
+					System.out.println(recievedDataString);
+				}
 			}
+			
+						
 		}
 	connectionSocket.close();
 	System.out.println("Socket closed succesfully. Goodbye.");

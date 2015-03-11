@@ -87,8 +87,46 @@ class HTTPclient {
 	
 	 
 	private static boolean parseInputURI(String inputURI){
+		
+		int indexOfScheme = 0;
+		int indexOfPath = 0;
+		int indexOfAuthority = 0;
+		
+		String URIScheme;
+		String URIAuthority;
+		String URIPath;
+/*		String URIQuerry; */
+	
+		if(inputURI.contains("://")){ //Check if there is a scheme
+			
+			indexOfScheme = inputURI.indexOf("://");
+			//toConsole("Contains ://");
+		
+			URIScheme = inputURI.substring(0, indexOfScheme);
+			indexOfAuthority= indexOfScheme + 3;
+			
+			//toConsole("URIScheme: " + URIScheme);
+		} else {URIScheme = null;}
+		
+		if(inputURI.substring(indexOfAuthority).contains("/")){ //TODO: See if I have to chop of / 
+			
+			toConsole("Substring: " + inputURI.substring(indexOfAuthority));
+			indexOfPath = inputURI.indexOf("/", indexOfAuthority);
+			toConsole("Contains a path. index: " + String.valueOf(indexOfPath));
+			URIPath = inputURI.substring(indexOfPath);
+			toConsole("URIPath: " + URIPath);
+								
+		} else { URIPath= "";}
+		
+		if(indexOfPath == 0){
+			URIAuthority = inputURI.substring(indexOfAuthority);
+		} else {
+			URIAuthority = inputURI.substring(indexOfAuthority, indexOfPath);
+		}
+			
+		toConsole(URIAuthority);
 		try{
-			currentURI = new URI(inputURI);
+			currentURI = new URI(URIScheme, URIAuthority, URIPath, null, null);
 			
 		} catch(URISyntaxException e){toConsole("Bad URI! Try again!"); return false;}
 		return true;
@@ -99,18 +137,22 @@ class HTTPclient {
 	
 	private static void setupSocket(){
 		try{
-			toConsole("Scheme: " + currentURI.getScheme());
-			toConsole("SchemeSpecificPart: " + currentURI.getSchemeSpecificPart());
-			toConsole("Fragment: " + currentURI.getFragment());
-			clientSocket = new Socket(currentURI.getSchemeSpecificPart(), port);
+			toConsole("Authority: " + currentURI.getAuthority());
+//			toConsole("SchemeSpecificPart: " + currentURI.getSchemeSpecificPart());
+//			toConsole("Fragment: " + currentURI.getFragment());
+		
+			clientSocket = new Socket(currentURI.getAuthority(), port);
 			outputClient = new DataOutputStream(clientSocket.getOutputStream());
 			bufferedInputReaderClient = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+		
 		} catch(UnknownHostException e) {
 			toConsole("Failed to resolve host. Please forgive me.");
 		} catch(IOException e){
 			toConsole("IOException - must shutdown.");
 		}
 	}
+	
+	
 	
 	
 	/**
@@ -137,9 +179,11 @@ class HTTPclient {
 	
 	private static void doGet(){
 		toConsole("Getting page");
-		cloneConsole("GET " + "/cde/bestelaanvraag_elcomp_NL.html " + "HTTP/1.1 \n");
-		cloneConsole("Host: " + currentURI.getSchemeSpecificPart() + "\n");
+		
+		cloneConsole("GET " + currentURI.getPath() + " " + "HTTP/1.1 \n");
+		cloneConsole("Host: " + currentURI.getAuthority() + "\n");
 		cloneConsole("\n");
+		
 		while(true){
 			try{
 				String recievedDataString = bufferedInputReaderClient.readLine();

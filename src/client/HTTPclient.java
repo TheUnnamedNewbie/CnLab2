@@ -4,8 +4,6 @@ import java.net.*;
 
 /*
  * HTTP main class for the client. 
- * Test: opens up a connection to localhoast port 44444
- * 
  */
 
 class HTTPclient {
@@ -18,13 +16,17 @@ class HTTPclient {
 	public static HTTPCommand commandType;
 	public static int port;
 	public static String version;
+	public static URI currentURI;
 	
-	
+	//Socket-Related stuffs.
+	private static Socket clientSocket;
+	private static DataOutputStream outputClient;
+	private static BufferedReader bufferedInputReaderClient;
 	
 	public static void main(String arg[]) throws Exception
 	{	
 		//Parsing of data
-			if(arg.length != nbCommands){ //Checking if enought commands are given.
+			if(arg.length != nbCommands){ //Checking if enough commands are given.
 				toConsole("Not enought data given. Please try again.");
 			} else{
 				commandType = parseVersion(arg[0]); //find out what type of HTTP command you have given.
@@ -33,10 +35,18 @@ class HTTPclient {
 				} else { 
 					boolean legalPort = parsePort(arg[2]); //find out what port you have given me
 					if(legalPort){ //if its a good port number, continue
-						parseInputURI(arg[1]);
+						boolean legalURI = parseInputURI(arg[1]);
+						if(legalURI){
+							//stuffs
+						}
 					}
 				}
 			} 
+			setupSocket();
+			
+			doCommand();
+			
+			
 			
 	}
 	
@@ -47,12 +57,12 @@ class HTTPclient {
 	
 	
 	/**
-	 * Sets the version of command this client has to excecute.
+	 * Sets the version of command this client has to execute.
 	 * @param version
 	 * @return HTTPCommand.version, version is invalid if not valid
 	 */
 	private static HTTPCommand parseVersion(String version){
-		if(version.contains("GET")) {return HTTPCommand.GET;}
+		if(version.contains("GET")) {return HTTPCommand.GET;} //Should prolly be a switch statement.
 		else if(version.contains("HEAD")) {return HTTPCommand.HEAD;}
 		else if(version.contains("PUT")) {return HTTPCommand.PUT;}
 		else if(version.contains("POST")) {return HTTPCommand.POST;}
@@ -75,14 +85,97 @@ class HTTPclient {
 	}
 	
 	
-	
-	private static void parseInputURI(String inputURI){
-		
+	 
+	private static boolean parseInputURI(String inputURI){
+		try{
+			currentURI = new URI(inputURI);
+			
+		} catch(URISyntaxException e){toConsole("Bad URI! Try again!"); return false;}
+		return true;
 	}
 	
 	
 	
 	
+	private static void setupSocket(){
+		try{
+			toConsole("Scheme: " + currentURI.getScheme());
+			toConsole("SchemeSpecificPart: " + currentURI.getSchemeSpecificPart());
+			toConsole("Fragment: " + currentURI.getFragment());
+			clientSocket = new Socket(currentURI.getSchemeSpecificPart(), port);
+			outputClient = new DataOutputStream(clientSocket.getOutputStream());
+			bufferedInputReaderClient = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+		} catch(UnknownHostException e) {
+			toConsole("Failed to resolve host. Please forgive me.");
+		} catch(IOException e){
+			toConsole("IOException - must shutdown.");
+		}
+	}
+	
+	
+	/**
+	 * 
+	 * @param data
+	 */
+	private static void doCommand(){
+		switch(commandType) {
+		case GET: doGet();
+			break;
+		case HEAD: doHead();
+			break;
+		case INVALID:
+			break;
+		case POST:doPost();
+			break;
+		case PUT: doPut();
+			break;
+		default: 
+			break;
+		
+		}
+	}
+	
+	private static void doGet(){
+		toConsole("Getting page");
+		cloneConsole("GET " + "/cde/bestelaanvraag_elcomp_NL.html " + "HTTP/1.1 \n");
+		cloneConsole("Host: " + currentURI.getSchemeSpecificPart() + "\n");
+		cloneConsole("\n");
+		while(true){
+			try{
+				String recievedDataString = bufferedInputReaderClient.readLine();
+				if(recievedDataString != null){
+				toConsole(recievedDataString);
+				}
+			} catch(IOException e) {toConsole("IOException in reading data");}
+		}
+	}
+	
+	private static void doHead(){
+		toConsole("Getting Head");
+	}
+	
+	private static void doPost(){
+		toConsole("Doing Post");
+	}
+	
+	private static void doPut(){
+		toConsole("Putting");
+	}
+	
+	
+	private static void cloneConsole(String data){
+		try {
+			toConsole("Sending: " + data);
+			outputClient.writeBytes(data);
+		} catch(IOException e) {toConsole("IOException! I tried to send: " + data);}
+		
+	}
+	
+	
+	
+	/*
+	 * Simply prints stuff in console. Quite self-explanatory.
+	 */
 	private static void toConsole(String data){
 		System.out.println(data);
 	}

@@ -2,20 +2,34 @@ package client;
 import java.io.*;
 import java.net.*;
 
+
+
 /*
  * HTTP main class for the client. 
+ * 
+ * 
+ * TODO:
+ * 		- Parse HTML data for embedded images
+ * 		- Implement if-modified-since
+ * 		- Make structure for parsing paths and such.
+ * 
+ * 
+ * 
+ * 
+ * 
  */
 
 class HTTPclient {
 	
 	
-	private static final int nbCommands = 3; //amount of commands the original call of server should contain.
-	
+	private static final int nbCommands = 4; //amount of commands the original call of server should contain.
+	private static final String clientVersion = "0.1";
+	private static final String EOL = "\n";
 	
 	//CommandSettings:
 	public static HTTPCommand commandType;
 	public static int port;
-	public static String version;
+	public static HTTPVersion HTTPversion;
 	public static URI currentURI;
 	
 	//Socket-Related stuffs.
@@ -23,13 +37,35 @@ class HTTPclient {
 	private static DataOutputStream outputClient;
 	private static BufferedReader bufferedInputReaderClient;
 	
+	
+	//File-Related stuffs
+	private static File log = new File("log.txt"); //contains previously visited domains (to check if pages might exist or not).
+	
 	public static void main(String arg[]) throws Exception
 	{	
-		//Parsing cof data
+		//init interface
+		toConsole("\n");
+		toConsole("VaesClient (tm) " + clientVersion);
+		toConsole("This is terrible software and will likely break. Use at own risk, and don't come blaming me if it ruins your marriage. \n");
+		toConsole("\n");
+		
+		File directory = new File(".\\he\\lo\\you");
+		directory.mkdirs();
+		
+		if(!log.exists()){
+			toConsole("First time running program! Making logfile...");
+			try{	
+				log.createNewFile();
+			} catch(IOException e){toConsole("Failed to create logfile! Will not store pages for furture reference.");}
+		}
+
+		
+		
+		//Parsing of data
 			if(arg.length != nbCommands){ //Checking if enough commands are given.
 				toConsole("Not enought data given. Please try again.");
 			} else{
-				commandType = parseVersion(arg[0]); //find out what type of HTTP command you have given.
+				commandType = parseCommand(arg[0]); //find out what type of HTTP command you have given.
 				if(commandType == HTTPCommand.INVALID){ //check if it was an actual legal type
 					toConsole("Invalid HTTP command. Try again."); //abort if not legal
 				} else { 
@@ -37,13 +73,14 @@ class HTTPclient {
 					if(legalPort){ //if its a good port number, continue
 						boolean legalURI = parseInputURI(arg[1]);
 						if(legalURI){
-							//stuffs
-						}
-					}
+							boolean legalVersion = parseVersion(arg[3]);
+							if(legalVersion){}
+							
+						} else toConsole("Invalid Version");
+					} else toConsole("Invalid Port");
 				}
 			} 
 			setupSocket();
-			
 			doCommand();
 			
 			
@@ -61,7 +98,7 @@ class HTTPclient {
 	 * @param version
 	 * @return HTTPCommand.version, version is invalid if not valid
 	 */
-	private static HTTPCommand parseVersion(String version){
+	private static HTTPCommand parseCommand(String version){
 		if(version.contains("GET")) {return HTTPCommand.GET;} //Should prolly be a switch statement.
 		else if(version.contains("HEAD")) {return HTTPCommand.HEAD;}
 		else if(version.contains("PUT")) {return HTTPCommand.PUT;}
@@ -100,21 +137,16 @@ class HTTPclient {
 		if(inputURI.contains("://")){ //Check if there is a scheme
 			
 			indexOfScheme = inputURI.indexOf("://");
-			//toConsole("Contains ://");
 		
 			URIScheme = inputURI.substring(0, indexOfScheme);
 			indexOfAuthority= indexOfScheme + 3;
-			
-			//toConsole("URIScheme: " + URIScheme);
+		
 		} else {URIScheme = null;}
 		
 		if(inputURI.substring(indexOfAuthority).contains("/")){ //TODO: See if I have to chop of / 
 			
-			toConsole("Substring: " + inputURI.substring(indexOfAuthority));
 			indexOfPath = inputURI.indexOf("/", indexOfAuthority);
-			toConsole("Contains a path. index: " + String.valueOf(indexOfPath));
 			URIPath = inputURI.substring(indexOfPath);
-			toConsole("URIPath: " + URIPath);
 								
 		} else { URIPath= "";}
 		
@@ -123,8 +155,7 @@ class HTTPclient {
 		} else {
 			URIAuthority = inputURI.substring(indexOfAuthority, indexOfPath);
 		}
-			
-		toConsole(URIAuthority);
+		
 		try{
 			currentURI = new URI(URIScheme, URIAuthority, URIPath, null, null);
 			
@@ -132,21 +163,25 @@ class HTTPclient {
 		return true;
 	}
 	
-	
+	private static boolean parseVersion(String versionString){
+		if(versionString.contains("1.0")){
+			HTTPversion = HTTPVersion.ONE;
+			return true;
+		} else if(versionString.contains("1.1")){
+			HTTPversion = HTTPVersion.TWO;
+			return true;
+		} else return false;
+	}
 	
 	
 	private static void setupSocket(){
 		try{
-			toConsole("Authority: " + currentURI.getAuthority());
-//			toConsole("SchemeSpecificPart: " + currentURI.getSchemeSpecificPart());
-//			toConsole("Fragment: " + currentURI.getFragment());
-		
 			clientSocket = new Socket(currentURI.getAuthority(), port);
 			outputClient = new DataOutputStream(clientSocket.getOutputStream());
 			bufferedInputReaderClient = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
 		
 		} catch(UnknownHostException e) {
-			toConsole("Failed to resolve host. Please forgive me.");
+			throw new IllegalArgumentException("Failed to resolve host. Please forgive me.");
 		} catch(IOException e){
 			toConsole("IOException - must shutdown.");
 		}
@@ -158,44 +193,79 @@ class HTTPclient {
 
 	
 	private static void doCommand(){
-		toConsole("Getting page");
+		toConsole("Cheking if page locally availible" + EOL);
+		boolean authorityInLog = checkForAuthority(currentURI.getAuthority());
 		
-		cloneConsole(commandType.toString() + " " + currentURI.getPath() + " " + "HTTP/1.1 \n");
-		cloneConsole("Host: " + currentURI.getAuthority() + "\n");
-		cloneConsole("\n");
+		//temporary, should be improved later
 		
-		while(true){ //TODO: Fix this.
+		if(!authorityInLog){ //
+			addToLog(currentURI.getAuthority());
+		}
+		
+		
+		
+		toConsole("Getting page \n");
+		cloneConsole(commandType.toString() + " " + currentURI.getPath() + " " + HTTPversion.toString() + " " + EOL);
+		
+		
+		if((commandType == HTTPCommand.GET) || (commandType == HTTPCommand.HEAD)){
+			cloneConsole("Host: " + currentURI.getAuthority() + EOL);
+			cloneConsole(EOL);
+		} else {
+			try{
+				String data = getInput();
+				outputClient.writeBytes(data);
+			} catch(IOException e){toConsole(e.toString());}
+		}
+	
+		
+		
+		boolean notDone = true;
+		int recievedLength = 0;
+	
+		
+		
+		while(notDone){ //TODO: Fix this.
 			try{
 				String recievedDataString = bufferedInputReaderClient.readLine();
+				recievedLength = recievedLength + recievedDataString.length();
 				if(recievedDataString != null){
-				toConsole(recievedDataString);
+					toConsole(String.valueOf(recievedLength) + " " +	recievedDataString);
 				}
+				
 			} catch(IOException e) {toConsole("IOException in reading data");}
 		}
+	
 	}
 	
-	private static void doHead(){
-		toConsole("Getting Head");
-	}
-	
-	private static void doPost(){
-		toConsole("Doing Post");
-	}
-	
-	private static void doPut(){
-		toConsole("Putting");
+
+	private static String getInput(){
+		BufferedReader inputFromConsole = new BufferedReader(new InputStreamReader(System.in));
+		boolean finished = false;
+		String userData=null;
+		toConsole("You selected " + commandType.toString() + ". What do you wish to send? \n");
+		while(!finished){ 
+			try{
+				userData = inputFromConsole.readLine();
+				toConsole("Are you sure? y/n");
+				if(inputFromConsole.readLine().contains("y")){
+					finished = true;
+				} else {toConsole("Try again: ");}
+			} catch(IOException e){toConsole("Try again");}
+		}
+		if(userData != null){return userData;}
+		else return "";
 	}
 	
 	
 	private static void cloneConsole(String data){
 		try {
-			toConsole("Sending: " + data);
+			toConsole(data);
 			outputClient.writeBytes(data);
 		} catch(IOException e) {toConsole("IOException! I tried to send: " + data);}
 		
 	}
-	
-	
+		
 	
 	/*
 	 * Simply prints stuff in console. Quite self-explanatory.
@@ -204,6 +274,44 @@ class HTTPclient {
 		System.out.println(data);
 	}
 	
+
+
+  
+  public static boolean checkForAuthority(String authority){
+	  boolean result = false;
+	  String line;
+	  try{
+	  	BufferedReader inputFromFile = new BufferedReader(new FileReader(log));
+	  	while((result == false) && (line = inputFromFile.readLine()) != null){
+	  		if(authority.equals(line)){
+	  			result = true;
+	  			toConsole("log contains authority!");
+	  		}
+	  	}
+	  	inputFromFile.close();
+	  	} catch(FileNotFoundException e){toConsole("Something went wrong! Can't find my logfile!");
+	  	} catch(IOException f){toConsole("IOException in checkForAuthority");
+	  	}
+	  return result;
+	  
+  }
+  
+  public static void addToLog(String authority){
+	  try{
+		  BufferedWriter outToFile = new BufferedWriter(new FileWriter(log, true));
+		  outToFile.write(authority + EOL);
+		  outToFile.close();
+	  } catch(FileNotFoundException e){
+		  toConsole("Can't find logfile!");
+	  } catch(IOException e){
+		  toConsole("IOException occured in addToLog!");
+	  }
+	  
+  }
+  
+ // public static void checkExistsFile
+
+
 	
 	
 	//TESTMETHOD NOT SUPPOSED TO BE IN FINAL PRODUCT
@@ -214,48 +322,3 @@ class HTTPclient {
 		}
 }
 
-/*
-		
-//		
-//		{	
-//		
-//		// setting up IO
-//		Socket connectionSocket = new Socket("www.esat.kuleuven.be", socketPort);
-//		DataOutputStream outputServer = new DataOutputStream(connectionSocket.getOutputStream());
-//		BufferedReader recievedData = new BufferedReader(new InputStreamReader(connectionSocket.getInputStream()));
-//		BufferedReader input = new BufferedReader(new InputStreamReader(System.in));		
-//		
-//		while(running){
-//	
-//			System.out.print("From Console: ");
-//			
-//			String inputUser = input.readLine();
-//			outputServer.writeBytes("GET /cde/bestelaanvraag_elcomp_NL.html" + "\n");
-//			outputServer.writeBytes("Host: www.esat.kuleuven.be" + "\n");
-//			outputServer.writeBytes("\n");
-//		
-//			if(inputUser.contains("Stop")){
-//				running = false;
-//				System.out.println("Sending Stop Command to servern...");
-//				outputServer.writeBytes("Stop");
-//				System.out.println("Stop signal sent....");
-//				System.out.println("closing socket...");
-//				}
-//			
-//			while(true){
-//				String recievedDataString = recievedData.readLine();
-//				if(recievedDataString != null){
-//					System.out.println(recievedDataString);
-//				}
-//			}
-//			
-//						
-//		}
-//	connectionSocket.close();
-//	System.out.println("Socket closed succesfully. Goodbye.");
-//	
-//	} 
-	
-
-}
-*/

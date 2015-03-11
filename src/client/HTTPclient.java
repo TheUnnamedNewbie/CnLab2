@@ -25,7 +25,7 @@ class HTTPclient {
 	
 	public static void main(String arg[]) throws Exception
 	{	
-		//Parsing of data
+		//Parsing cof data
 			if(arg.length != nbCommands){ //Checking if enough commands are given.
 				toConsole("Not enought data given. Please try again.");
 			} else{
@@ -155,36 +155,16 @@ class HTTPclient {
 	
 	
 	
-	/**
-	 * 
-	 * @param data
-	 */
-	private static void doCommand(){
-		switch(commandType) {
-		case GET: doGet();
-			break;
-		case HEAD: doHead();
-			break;
-		case INVALID:
-			break;
-		case POST:doPost();
-			break;
-		case PUT: doPut();
-			break;
-		default: 
-			break;
-		
-		}
-	}
+
 	
-	private static void doGet(){
+	private static void doCommand(){
 		toConsole("Getting page");
 		
-		cloneConsole("GET " + currentURI.getPath() + " " + "HTTP/1.1 \n");
+		cloneConsole(commandType.toString() + " " + currentURI.getPath() + " " + "HTTP/1.1 \n");
 		cloneConsole("Host: " + currentURI.getAuthority() + "\n");
 		cloneConsole("\n");
 		
-		while(true){
+		while(true){ //TODO: Fix this.
 			try{
 				String recievedDataString = bufferedInputReaderClient.readLine();
 				if(recievedDataString != null){

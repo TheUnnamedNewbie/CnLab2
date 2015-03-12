@@ -2,8 +2,6 @@ package client;
 import java.io.*;
 import java.net.*;
 
-
-
 /*
  * HTTP main class for the client. 
  * 
@@ -23,7 +21,7 @@ class HTTPclient {
 	
 	
 	private static final int nbCommands = 4; //amount of commands the original call of server should contain.
-	private static final String clientVersion = "0.1";
+	private static final String clientVersion = "0.1.1";
 	private static final String EOL = "\n";
 	
 	//CommandSettings:
@@ -49,8 +47,7 @@ class HTTPclient {
 		toConsole("This is terrible software and will likely break. Use at own risk, and don't come blaming me if it ruins your marriage. \n");
 		toConsole("\n");
 		
-		File directory = new File(".\\he\\lo\\you");
-		directory.mkdirs();
+	
 		
 		if(!log.exists()){
 			toConsole("First time running program! Making logfile...");
@@ -63,26 +60,28 @@ class HTTPclient {
 		
 		//Parsing of data
 			if(arg.length != nbCommands){ //Checking if enough commands are given.
-				toConsole("Not enought data given. Please try again.");
-			} else{
+				if(arg.length == 0){
+					toConsole("To use this client, use the following command style: \n \n  HTTPCommand URI Port HTTPversion \n\n");
+				} else{ toConsole("I can't understand your commands. Use the following structure: \n \n  HTTPCommand URI Port HTTPversion \n \n If you did use this structure, Check if the data was correct. If so, well, Tought luck");}
+			} else {
 				commandType = parseCommand(arg[0]); //find out what type of HTTP command you have given.
 				if(commandType == HTTPCommand.INVALID){ //check if it was an actual legal type
 					toConsole("Invalid HTTP command. Try again."); //abort if not legal
 				} else { 
 					boolean legalPort = parsePort(arg[2]); //find out what port you have given me
 					if(legalPort){ //if its a good port number, continue
-						boolean legalURI = parseInputURI(arg[1]);
-						if(legalURI){
+						currentURI = parseInputURI(arg[1]);
+						if(currentURI != null){
 							boolean legalVersion = parseVersion(arg[3]);
 							if(legalVersion){}
 							
 						} else toConsole("Invalid Version");
 					} else toConsole("Invalid Port");
 				}
-			} 
+			
 			setupSocket();
 			doCommand();
-			
+			}
 			
 			
 	}
@@ -121,9 +120,7 @@ class HTTPclient {
 		return true;
 	}
 	
-	
-	 
-	private static boolean parseInputURI(String inputURI){
+	private static URI parseInputURI(String inputURI){
 		
 		int indexOfScheme = 0;
 		int indexOfPath = 0;
@@ -157,10 +154,10 @@ class HTTPclient {
 		}
 		
 		try{
-			currentURI = new URI(URIScheme, URIAuthority, URIPath, null, null);
+			return new URI(URIScheme, URIAuthority, URIPath, null, null);
 			
-		} catch(URISyntaxException e){toConsole("Bad URI! Try again!"); return false;}
-		return true;
+		} catch(URISyntaxException e){toConsole("Bad URI! Try again!"); return null;}
+		
 	}
 	
 	private static boolean parseVersion(String versionString){
@@ -172,7 +169,6 @@ class HTTPclient {
 			return true;
 		} else return false;
 	}
-	
 	
 	private static void setupSocket(){
 		try{
@@ -190,23 +186,36 @@ class HTTPclient {
 	
 	
 	
-
 	
 	private static void doCommand(){
 		toConsole("Cheking if page locally availible" + EOL);
-		boolean authorityInLog = checkForAuthority(currentURI.getAuthority());
-		
+
 		//temporary, should be improved later
 		
-		if(!authorityInLog){ //
-			addToLog(currentURI.getAuthority());
+			File temp = new File(currentURI.getAuthority());
+			if(!temp.exists()){
+				temp.mkdir();
+				temp.setWritable(true);
+			} temp.setWritable(true);
+			
+		
+		if(currentURI.getPath()== ""){
+			//TODO: should try index.html then index.htm then default.htm
 		}
-		
-		
-		
+			
+			
+		String pathOfFile = makePath(currentURI.getPath());
+		File destination = new File(pathOfFile);
+		if(!(destination.exists())){
+			try{
+				destination.getParentFile().mkdirs(); 
+				toConsole("Making Dirs!");
+				destination.createNewFile();
+			} catch(IOException e){toConsole("Failed to create dir");}
+		}
+
 		toConsole("Getting page \n");
 		cloneConsole(commandType.toString() + " " + currentURI.getPath() + " " + HTTPversion.toString() + " " + EOL);
-		
 		
 		if((commandType == HTTPCommand.GET) || (commandType == HTTPCommand.HEAD)){
 			cloneConsole("Host: " + currentURI.getAuthority() + EOL);
@@ -217,24 +226,54 @@ class HTTPclient {
 				outputClient.writeBytes(data);
 			} catch(IOException e){toConsole(e.toString());}
 		}
+		BufferedWriter clear;
+		try {
+			clear = new BufferedWriter(new FileWriter(destination));
+			clear.write("");
+			clear.close();
+			} catch (IOException e1) {
+			e1.printStackTrace();
+		}
 	
-		
-		
+		StringBuilder fileString = new StringBuilder();
 		boolean notDone = true;
 		int recievedLength = 0;
-	
-		
-		
-		while(notDone){ //TODO: Fix this.
-			try{
+		int contentLength = 0;
+		boolean started = false;
+		boolean usesContentLength = false;
+		try{
+			while(notDone){ //TODO: Fix this - only works with ContentLength, at the moment does not terminate on a normal file.
 				String recievedDataString = bufferedInputReaderClient.readLine();
-				recievedLength = recievedLength + recievedDataString.length();
-				if(recievedDataString != null){
-					toConsole(String.valueOf(recievedLength) + " " +	recievedDataString);
+				if(started){
+					fileString.append(recievedDataString + "\r" + EOL);
+				} else {toConsole(recievedDataString);}
+				toConsole(String.valueOf((contentLength - recievedLength)));
+				if(recievedDataString.contains("Content-Length:")){
+					contentLength = Integer.parseInt(recievedDataString.substring(16))+1;
+					usesContentLength = true;
 				}
-				
-			} catch(IOException e) {toConsole("IOException in reading data");}
-		}
+				if(!started && recievedDataString.equals("")){
+					started=true;
+					recievedLength = 0;
+					if(commandType == HTTPCommand.HEAD){
+						notDone = false;
+					}
+				}
+				recievedLength = recievedLength + recievedDataString.length()+1;
+				if(started && (contentLength == recievedLength)){
+					notDone = false;
+				}
+			
+			}
+		
+			//STORE STRING
+			
+			BufferedWriter outToDestination = new BufferedWriter(new FileWriter(destination, true));
+			outToDestination.write(fileString.toString());
+			outToDestination.close();
+		
+		} catch(IOException e) {toConsole("IOException in reading data");}
+		parseImages(destination);
 	
 	}
 	
@@ -309,11 +348,71 @@ class HTTPclient {
 	  
   }
   
+  
+  public static String makePath(String source){
+	  int parseIndex = 0;
+	  StringBuilder buildingPath = new StringBuilder();
+	  buildingPath.append("." + System.getProperty("file.separator") + currentURI.getAuthority());
+	  while(parseIndex < source.length()){
+		  char charAtIndex = source.charAt(parseIndex); //toConsole("Index: " + String.valueOf(parseIndex) + "Char: " + String.valueOf(charAtIndex));
+		  if(charAtIndex == '/') {
+			  buildingPath.append(System.getProperty("file.separator"));
+		  } else {
+			  buildingPath.append(source.charAt(parseIndex));
+		  } 
+		  parseIndex++;
+	  }
+	  return buildingPath.toString();
+  }
+  
  // public static void checkExistsFile
 
-
+  
+  /**
+   * NOTE: I assume the source file is a propperly build up HTML file (it stops parsing when it runs into <\html>
+   * @param source
+   */
+  public static void parseImages(File source){
+	boolean endOfFile = false;
+	  try{
+		StringBuilder newFile = new StringBuilder();
+		BufferedReader inputFromFile = new BufferedReader(new FileReader(source));
+		while(!endOfFile){
+			String currentLine = inputFromFile.readLine();
+			if(currentLine.contains("</html>")){
+				endOfFile = true;
+			}
+			int index = 0;
+			if(currentLine.substring(index).contains("<img src=")){
+				int startIndex = 10 + currentLine.indexOf("<img src=", index);
+				int endIndex = currentLine.indexOf("\"", startIndex);
+				String imageLocation = currentLine.substring(startIndex, endIndex);
+				getImage(imageLocation, source.getAbsolutePath());
+			}
+		}
+		inputFromFile.close();
+		
+		
 	
 	
+	
+	
+	} catch(FileNotFoundException e1){
+		toConsole("I ran into a issue while locating the images. I'm sorry");
+	} catch(IOException e2){
+		toConsole("IOException during file-parsing");
+	}
+  }
+	
+  public static void getImage(String imageLocation, String absolutePath){
+	  if(imageLocation.substring(0, 2).equals("../")){
+		  toConsole("go Down one directory");
+	  } else if{
+		  if(imageLocation.substring(0, 2).equals("./")){
+		  //stuff goes here aswell
+		  }
+  }
+  
 	//TESTMETHOD NOT SUPPOSED TO BE IN FINAL PRODUCT
 		public static void printCommand() {
 			if(commandType == HTTPCommand.GET){System.out.println("Command is GET");}
